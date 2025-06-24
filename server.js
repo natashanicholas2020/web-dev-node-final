@@ -271,6 +271,32 @@ app.get('/api/islanders/:id', async (req, res) => {
   }
 });
 
+// Add this in your server.js after other routes
+
+app.get('/api/users/search', authenticateToken, async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.json([]);
+
+  try {
+    const regex = new RegExp(q, 'i'); // case-insensitive search
+    const users = await User.find({
+      $or: [
+        { username: regex },
+        { firstName: regex },
+        { lastName: regex },
+        { email: regex },
+      ],
+    })
+    .select('-password')
+    .limit(20);
+    res.json(users);
+  } catch (error) {
+    console.error('User search error:', error);
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+
 // ===== Start Server =====
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
