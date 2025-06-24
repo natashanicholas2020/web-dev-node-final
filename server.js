@@ -500,6 +500,18 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/islanders', async (req, res) => {
+  try {
+    const islanders = await Islander.find();
+    console.log(`Found ${islanders.length} islanders`);
+    res.json(islanders);
+  } catch (error) {
+    console.error('Error fetching islanders:', error);
+    res.status(500).send('Server error');
+  }
+});
+
+
 // Get all islanders (public)
 app.get('/api/islanders', async (req, res) => {
   try {
