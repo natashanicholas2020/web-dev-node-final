@@ -311,6 +311,30 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
   }
 });
 
+app.put('/api/profile', authenticateToken, async (req, res) => {
+  const username = req.user.username;  // use username from JWT payload
+  const { firstName, lastName, email, dob } = req.body;
+
+  try {
+    const updatedUser = await User.findOneAndUpdate(
+      { username },
+      { firstName, lastName, email, dob },
+      { new: true, select: '-password' }  // return updated user without password
+    );
+
+    if (!updatedUser) {
+      return res.status(404).send('User not found');
+    }
+
+    res.json(updatedUser);
+  } catch (e) {
+    console.error('Failed to update profile:', e);
+    res.status(500).send('Failed to update profile');
+  }
+});
+
+
+
 // Get all posts (public)
 app.get('/api/posts', async (req, res) => {
   try {
