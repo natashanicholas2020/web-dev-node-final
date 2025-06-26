@@ -509,6 +509,24 @@ app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
 });
 
 
+// Get posts liked by a specific user (auth required)
+app.get('/api/users/:username/likes', authenticateToken, async (req, res) => {
+  const username = req.params.username;
+
+  try {
+    // Find posts where userReactions map has the username with 'up' reaction
+    const likedPosts = await Post.find({
+      [`userReactions.${username}`]: 'up'
+    }).sort({ datetime: -1 });
+
+    res.json(likedPosts);
+  } catch (error) {
+    console.error('Error fetching liked posts:', error);
+    res.status(500).send('Server error');
+  }
+});
+
+
 
 
 // ===== Start Server =====
