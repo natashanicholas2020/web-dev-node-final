@@ -40,7 +40,7 @@ const islanderSchema = new mongoose.Schema({
 }, { collection: 'Islanders' });
 
 const userSchema = new mongoose.Schema({
-  _id: String,  // ✅ add this line to allow string IDs like "u002"
+  // _id: String,  // ✅ add this line to allow string IDs like "u002"
   username: { type: String, unique: true, required: true },
   password: { type: String, required: true },
   firstName: String,
@@ -55,7 +55,6 @@ const userSchema = new mongoose.Schema({
   followers: { type: [String], default: [] },
   following: { type: [String], default: [] },
 }, { collection: 'Users' });
-
 
 
 // Updated postSchema to include replies array
