@@ -75,11 +75,22 @@ const Post = mongoose.model('Post', postSchema);
 // ===== Middleware to authenticate token =====
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).send('Access denied');
+  if (!authHeader) {
+    console.log('No Authorization header');
+    return res.status(401).send('Access denied');
+  }
+  const token = authHeader.split(' ')[1];
+  if (!token) {
+    console.log('No token found in header');
+    return res.status(401).send('Access denied');
+  }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).send('Invalid token');
+    if (err) {
+      console.log('JWT verify error:', err);
+      return res.status(403).send('Invalid token');
+    }
+    console.log('JWT verified user:', user);
     req.user = user;
     next();
   });
