@@ -70,14 +70,22 @@ const postSchema = new mongoose.Schema({
       message: String,
       datetime: { type: Date, default: Date.now }
     }
-  ]
+  ],
+  likes: { type: Number, default: 0 },  // total likes count
+  userReactions: {                       // key: username, value: 'up' or 'down'
+    type: Map,
+    of: String,
+    default: {}
+  }
 }, { collection: 'Posts' });
+
 
 const Islander = mongoose.model('Islander', islanderSchema);
 const User = mongoose.model('User', userSchema);
 const Post = mongoose.model('Post', postSchema);
 
 // ===== Middleware to authenticate token =====
+// ===== Middleware to authenticate token (required) =====
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   if (!authHeader) {
@@ -100,6 +108,21 @@ function authenticateToken(req, res, next) {
     next();
   });
 }
+
+// ===== Middleware to authenticate token (optional) =====
+function authenticateTokenOptional(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) return next();
+
+  const token = authHeader.split(' ')[1];
+  if (!token) return next();
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (!err) req.user = user;
+    next();
+  });
+}
+
 
 // ===== Routes =====
 
@@ -196,15 +219,34 @@ app.post('/api/signup', async (req, res) => {
 
 
 // Get all posts (public)
-app.get('/api/posts', async (req, res) => {
+app.get('/api/posts', authenticateTokenOptional, async (req, res) => {
   try {
     const posts = await Post.find().sort({ datetime: -1 });
-    res.json(posts);
+
+    // If user is logged in, include their reaction per post
+    const username = req.user ? req.user.username : null;
+
+    const postsWithReactions = posts.map(post => {
+      const userReaction = username ? post.userReactions.get(username) || null : null;
+      return {
+        _id: post._id,
+        username: post.username,
+        name: post.name,
+        message: post.message,
+        datetime: post.datetime,
+        replies: post.replies,
+        likes: post.likes,
+        userReaction,
+      };
+    });
+
+    res.json(postsWithReactions);
   } catch (error) {
     console.error('Error fetching posts:', error);
     res.status(500).send('Server error');
   }
 });
+
 
 // Get a single post by ID (public)
 app.get('/api/posts/:id', async (req, res) => {
@@ -410,6 +452,58 @@ app.post('/api/users/:username/unfollow', authenticateToken, async (req, res) =>
     res.status(200).send('Unfollowed successfully');
   } catch (error) {
     console.error('Unfollow error:', error);
+    res.status(500).send('Server error');
+  }
+});
+
+app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
+  const postId = req.params.id;
+  const username = req.user.username;
+  const { reaction } = req.body;  // expected 'up', 'down', or null to remove reaction
+
+  if (!['up', 'down', null].includes(reaction)) {
+    return res.status(400).send('Invalid reaction');
+  }
+
+  try {
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).send('Post not found');
+
+    const prevReaction = post.userReactions.get(username) || null;
+
+    if (reaction === prevReaction) {
+      // Same reaction: remove reaction
+      post.userReactions.delete(username);
+
+      if (prevReaction === 'up') post.likes = Math.max(0, post.likes - 1);
+      else if (prevReaction === 'down') post.likes = post.likes + 1; // or adjust if you treat dislikes differently
+    } else {
+      // Different reaction: update accordingly
+      if (prevReaction === 'up') {
+        post.likes = Math.max(0, post.likes - 1);
+      } else if (prevReaction === 'down') {
+        post.likes = post.likes + 1;  // adjust if dislikes are tracked separately
+      }
+
+      if (reaction === 'up') {
+        post.likes = post.likes + 1;
+      } else if (reaction === 'down') {
+        post.likes = post.likes - 1;  // example: dislikes subtract likes
+      }
+
+      if (reaction) {
+        post.userReactions.set(username, reaction);
+      } else {
+        post.userReactions.delete(username);
+      }
+    }
+
+    await post.save();
+
+    // Return current likes count and the user's reaction
+    res.json({ likes: post.likes, userReaction: post.userReactions.get(username) || null });
+  } catch (error) {
+    console.error('Error updating reaction:', error);
     res.status(500).send('Server error');
   }
 });
