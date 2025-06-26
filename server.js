@@ -9,21 +9,19 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// MongoDB connection
 const MONGO_URI = process.env.MONGO_URI;
 if (!MONGO_URI) {
-  console.error('❌ MONGO_URI is not defined in .env');
+  console.error('MONGO_URI is not defined in .env');
   process.exit(1);
 }
 
 mongoose.connect(MONGO_URI)
-  .then(() => console.log('✅ Connected to MongoDB'))
+  .then(() => console.log('Connected to MongoDB'))
   .catch(err => {
-    console.error('❌ MongoDB connection error:', err);
+    console.error('MongoDB connection error:', err);
     process.exit(1);
   });
 
@@ -40,7 +38,7 @@ const islanderSchema = new mongoose.Schema({
 }, { collection: 'Islanders' });
 
 const userSchema = new mongoose.Schema({
-  // _id: String,  // ✅ add this line to allow string IDs like "u002"
+  // _id: String, 
   username: { type: String, unique: true, required: true },
   password: { type: String, required: true },
   firstName: String,
@@ -56,8 +54,6 @@ const userSchema = new mongoose.Schema({
   following: { type: [String], default: [] },
 }, { collection: 'Users' });
 
-
-// Updated postSchema to include replies array
 const postSchema = new mongoose.Schema({
   username: { type: String, required: true },
   name: String,
@@ -70,8 +66,8 @@ const postSchema = new mongoose.Schema({
       datetime: { type: Date, default: Date.now }
     }
   ],
-  likes: { type: Number, default: 0 },  // total likes count
-  userReactions: {                       // key: username, value: 'up' or 'down'
+  likes: { type: Number, default: 0 }, 
+  userReactions: {                
     type: Map,
     of: String,
     default: {}
@@ -84,7 +80,6 @@ const User = mongoose.model('User', userSchema);
 const Post = mongoose.model('Post', postSchema);
 
 // ===== Middleware to authenticate token =====
-// ===== Middleware to authenticate token (required) =====
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   if (!authHeader) {
@@ -125,7 +120,6 @@ function authenticateTokenOptional(req, res, next) {
 
 // ===== Routes =====
 
-// Login (returns JWT)
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -142,7 +136,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Get profile (requires auth)
 app.get('/api/profile', authenticateToken, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.user.username }).select('-password');
@@ -155,14 +148,14 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
 });
 
 app.put('/api/profile', authenticateToken, async (req, res) => {
-  const username = req.user.username;  // use username from JWT payload
+  const username = req.user.username; 
   const { firstName, lastName, email, dob } = req.body;
 
   try {
     const updatedUser = await User.findOneAndUpdate(
       { username },
       { firstName, lastName, email, dob },
-      { new: true, select: '-password' }  // return updated user without password
+      { new: true, select: '-password' }  
     );
 
     if (!updatedUser) {
@@ -176,7 +169,6 @@ app.put('/api/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Signup endpoint
 app.post('/api/signup', async (req, res) => {
   const { username, password, firstName, lastName, email, dob, role } = req.body;
 
@@ -185,22 +177,20 @@ app.post('/api/signup', async (req, res) => {
   }
 
   try {
-    // Check if username already exists
     const existingUser = await User.findOne({ username });
     if (existingUser) {
       return res.status(409).send('Username already exists');
     }
 
-    // Create new user document
     const newUser = new User({
       username,
-      password,  // Note: In production, hash the password before saving!
+      password,  
       firstName,
       lastName,
       email,
       dob,
       role,
-      loginId: "",       // You can customize or remove this if not needed on signup
+      loginId: "",       
       section: "",
       lastActivity: "",
       totalActivity: ""
@@ -215,14 +205,10 @@ app.post('/api/signup', async (req, res) => {
   }
 });
 
-
-
-// Get all posts (public)
 app.get('/api/posts', authenticateTokenOptional, async (req, res) => {
   try {
     const posts = await Post.find().sort({ datetime: -1 });
 
-    // If user is logged in, include their reaction per post
     const username = req.user ? req.user.username : null;
 
     const postsWithReactions = posts.map(post => {
@@ -246,8 +232,6 @@ app.get('/api/posts', authenticateTokenOptional, async (req, res) => {
   }
 });
 
-
-// Get a single post by ID (public)
 app.get('/api/posts/:id', async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -259,7 +243,6 @@ app.get('/api/posts/:id', async (req, res) => {
   }
 });
 
-// Create a post (auth required)
 app.post('/api/posts', authenticateToken, async (req, res) => {
   const { name, message } = req.body;
   if (!name || !message) return res.status(400).send('Name and message are required');
@@ -278,7 +261,6 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
   }
 });
 
-// Add a reply to a post (auth required)
 app.post('/api/posts/:id/replies', authenticateToken, async (req, res) => {
   const { message } = req.body;
   if (!message || !message.trim()) {
@@ -305,7 +287,6 @@ app.post('/api/posts/:id/replies', authenticateToken, async (req, res) => {
   }
 });
 
-// Get all islanders (public)
 app.get('/api/islanders', async (req, res) => {
   try {
     const islanders = await Islander.find();
@@ -316,7 +297,6 @@ app.get('/api/islanders', async (req, res) => {
   }
 });
 
-// Get islander by ID (public)
 app.get('/api/islanders/:id', async (req, res) => {
   try {
     const islander = await Islander.findById(req.params.id);
@@ -328,14 +308,12 @@ app.get('/api/islanders/:id', async (req, res) => {
   }
 });
 
-// Add this in your server.js after other routes
-
 app.get('/api/users/search', authenticateToken, async (req, res) => {
   const { q } = req.query;
   if (!q) return res.json([]);
 
   try {
-    const regex = new RegExp(q, 'i'); // case-insensitive search
+    const regex = new RegExp(q, 'i'); 
     const users = await User.find({
       $or: [
         { username: regex },
@@ -353,7 +331,6 @@ app.get('/api/users/search', authenticateToken, async (req, res) => {
   }
 });
 
-// Get user by username (protected route)
 app.get('/api/users/:username', authenticateToken, async (req, res) => {
   const username = req.params.username;
 
@@ -367,7 +344,6 @@ app.get('/api/users/:username', authenticateToken, async (req, res) => {
   }
 });
 
-// Get posts by username (auth required)
 app.get('/api/users/:username/posts', authenticateToken, async (req, res) => {
   const username = req.params.username;
 
@@ -380,7 +356,6 @@ app.get('/api/users/:username/posts', authenticateToken, async (req, res) => {
   }
 });
 
-// Follow a user
 app.post('/api/users/:username/follow', authenticateToken, async (req, res) => {
   const targetUsername = req.params.username;
   const currentUsername = req.user.username;
@@ -403,7 +378,7 @@ app.post('/api/users/:username/follow', authenticateToken, async (req, res) => {
     if (!targetUser.followers.includes(currentUsername)) {
       await User.updateOne(
         { username: targetUsername },
-        { $addToSet: { followers: currentUsername } }  // avoids duplicates
+        { $addToSet: { followers: currentUsername } } 
       );
       
       await User.updateOne(
@@ -420,7 +395,6 @@ app.post('/api/users/:username/follow', authenticateToken, async (req, res) => {
   }
 });
 
-// Unfollow a user
 app.post('/api/users/:username/unfollow', authenticateToken, async (req, res) => {
   const targetUsername = req.params.username;
   const currentUsername = req.user.username;
@@ -458,7 +432,7 @@ app.post('/api/users/:username/unfollow', authenticateToken, async (req, res) =>
 app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
   const postId = req.params.id;
   const username = req.user.username;
-  const { reaction } = req.body;  // expected 'up', 'down', or null to remove reaction
+  const { reaction } = req.body;  
 
   if (!['up', 'down', null].includes(reaction)) {
     return res.status(400).send('Invalid reaction');
@@ -471,23 +445,21 @@ app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
     const prevReaction = post.userReactions.get(username) || null;
 
     if (reaction === prevReaction) {
-      // Same reaction: remove reaction
       post.userReactions.delete(username);
 
       if (prevReaction === 'up') post.likes = Math.max(0, post.likes - 1);
-      else if (prevReaction === 'down') post.likes = post.likes + 1; // or adjust if you treat dislikes differently
+      else if (prevReaction === 'down') post.likes = post.likes + 1; 
     } else {
-      // Different reaction: update accordingly
       if (prevReaction === 'up') {
         post.likes = Math.max(0, post.likes - 1);
       } else if (prevReaction === 'down') {
-        post.likes = post.likes + 1;  // adjust if dislikes are tracked separately
+        post.likes = post.likes + 1;  
       }
 
       if (reaction === 'up') {
         post.likes = post.likes + 1;
       } else if (reaction === 'down') {
-        post.likes = post.likes - 1;  // example: dislikes subtract likes
+        post.likes = post.likes - 1; 
       }
 
       if (reaction) {
@@ -499,7 +471,6 @@ app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
 
     await post.save();
 
-    // Return current likes count and the user's reaction
     res.json({ likes: post.likes, userReaction: post.userReactions.get(username) || null });
   } catch (error) {
     console.error('Error updating reaction:', error);
@@ -507,13 +478,10 @@ app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
   }
 });
 
-
-// Get posts liked by a specific user (auth required)
 app.get('/api/users/:username/likes', authenticateToken, async (req, res) => {
   const username = req.params.username;
 
   try {
-    // Find posts where userReactions map has the username with 'up' reaction
     const likedPosts = await Post.find({
       [`userReactions.${username}`]: 'up'
     }).sort({ datetime: -1 });
@@ -525,10 +493,7 @@ app.get('/api/users/:username/likes', authenticateToken, async (req, res) => {
   }
 });
 
-
-
-
 // ===== Start Server =====
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
