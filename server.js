@@ -40,6 +40,7 @@ const islanderSchema = new mongoose.Schema({
 }, { collection: 'Islanders' });
 
 const userSchema = new mongoose.Schema({
+  _id: String,  // ✅ add this line to allow string IDs like "u002"
   username: { type: String, unique: true, required: true },
   password: { type: String, required: true },
   firstName: String,
@@ -51,7 +52,11 @@ const userSchema = new mongoose.Schema({
   section: String,
   lastActivity: String,
   totalActivity: String,
+  followers: { type: [String], default: [] },
+  following: { type: [String], default: [] },
 }, { collection: 'Users' });
+
+
 
 // Updated postSchema to include replies array
 const postSchema = new mongoose.Schema({
@@ -333,6 +338,82 @@ app.get('/api/users/:username/posts', authenticateToken, async (req, res) => {
     res.status(500).send('Server error');
   }
 });
+
+// Follow a user
+app.post('/api/users/:username/follow', authenticateToken, async (req, res) => {
+  const targetUsername = req.params.username;
+  const currentUsername = req.user.username;
+
+  if (currentUsername === targetUsername) {
+    return res.status(400).send("You cannot follow yourself");
+  }
+
+  try {
+    const targetUser = await User.findOne({ username: targetUsername });
+    const currentUser = await User.findOne({ username: currentUsername });
+
+    if (!targetUser || !currentUser) {
+      return res.status(404).send('User not found');
+    }
+
+    if (!targetUser.followers) targetUser.followers = [];
+    if (!currentUser.following) currentUser.following = [];
+
+    if (!targetUser.followers.includes(currentUsername)) {
+      await User.updateOne(
+        { username: targetUsername },
+        { $addToSet: { followers: currentUsername } }  // avoids duplicates
+      );
+      
+      await User.updateOne(
+        { username: currentUsername },
+        { $addToSet: { following: targetUsername } }
+      );
+      
+    }
+
+    res.status(200).send('Followed successfully');
+  } catch (error) {
+    console.error('Follow error:', error);
+    res.status(500).send('Server error');
+  }
+});
+
+// Unfollow a user
+app.post('/api/users/:username/unfollow', authenticateToken, async (req, res) => {
+  const targetUsername = req.params.username;
+  const currentUsername = req.user.username;
+
+  if (currentUsername === targetUsername) {
+    return res.status(400).send("You cannot unfollow yourself");
+  }
+
+  try {
+    const targetUser = await User.findOne({ username: targetUsername });
+    const currentUser = await User.findOne({ username: currentUsername });
+
+    if (!targetUser || !currentUser) {
+      return res.status(404).send('User not found');
+    }
+
+    await User.updateOne(
+      { username: targetUsername },
+      { $pull: { followers: currentUsername } }
+    );
+    
+    await User.updateOne(
+      { username: currentUsername },
+      { $pull: { following: targetUsername } }
+    );
+    
+
+    res.status(200).send('Unfollowed successfully');
+  } catch (error) {
+    console.error('Unfollow error:', error);
+    res.status(500).send('Server error');
+  }
+});
+
 
 
 
