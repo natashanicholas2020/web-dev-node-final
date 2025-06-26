@@ -307,6 +307,34 @@ app.get('/api/users/search', authenticateToken, async (req, res) => {
   }
 });
 
+// Get user by username (protected route)
+app.get('/api/users/:username', authenticateToken, async (req, res) => {
+  const username = req.params.username;
+
+  try {
+    const user = await User.findOne({ username }).select('-password');
+    if (!user) return res.status(404).send('User not found');
+    res.json(user);
+  } catch (error) {
+    console.error('Error fetching user by username:', error);
+    res.status(500).send('Server error');
+  }
+});
+
+// Get posts by username (auth required)
+app.get('/api/users/:username/posts', authenticateToken, async (req, res) => {
+  const username = req.params.username;
+
+  try {
+    const posts = await Post.find({ username }).sort({ datetime: -1 });
+    res.json(posts);
+  } catch (error) {
+    console.error('Error fetching posts by username:', error);
+    res.status(500).send('Server error');
+  }
+});
+
+
 
 // ===== Start Server =====
 app.listen(PORT, () => {
